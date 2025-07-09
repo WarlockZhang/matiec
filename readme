@@ -1,429 +1,144 @@
-
-
-
-  MATIEC - IEC 61131-3 compiler
-
-
-  The following compiler has been based on the
-  FINAL DRAFT - IEC 61131-3, 2nd Ed. (2001-12-10)
-
-
-  Copyright (C) 2003-2012  Mario de Sousa (msousa@fe.up.pt)
-
-
-****************************************************************
-****************************************************************
-****************************************************************
-*********                                              *********
-*********                                              *********
+MATIEC - IEC 61131-3 编译器
+以下编译器基于 IEC 61131-3 最终草案（第二版，2001 年 12 月 10 日）。
+版权所有 ©2003-2012 Mario de Sousa (msousa@fe.up.pt)
 *********         O V E R A L L    G O A L S           *********
-*********                                              *********
-*********                                              *********
-****************************************************************
-****************************************************************
-****************************************************************
-
-
-
- This project has the goal of producing an open source compiler for the programming languages defined
-in the IEC 61131-3 standard. These programming languages are mostly used in the industrial automation 
-domain, to program PLCs (Programmable Logic Controllers).
-
- This standard defines 5 programming languages:
-     - IL : Instructtion List
-            A textual programming language, somewhat similar to assembly.
-     - ST : Structured Text
-            A textual programming language, somewhat similar to Pascal.
-     - FBD: Function Block Diagram
-            A graphical programming language, somewhat similar to an electrical circuit diagram based on small 
-             scale integration ICs (Integrated Circuits) (counters, AND/OR/XOR/... logic gates, timers, ...).
-     - LD : Ladder Diagram
-            A graphical programming language, somewhat similar to an electrical circuit diagram based on 
-             relays (used for basic cabled logic controllers).
-     - SFC: Sequential Function Chart
-            A graphical programming language, that defines a state machine, based largely on Grafcet.
-            (may also be expressed in textual format).
-
- Of the above 5 languages, the standard defines textual representations for IL, ST and SFC. 
-It is these 3 languages that we target, and we currently support all three, as long as they are
-expressed in the textual format as defined in the standard.
-
- Currently the matiec project generates two compilers (more correctly, code translaters, but we like
-to call them compilers :-O ): iec2c, and iec2iec
-
- Both compilers accept the same input: a text file with ST, IL and/or SFC code.
-
- The iec2c compiler generates ANSI C code which is equivalent to the IEC 61131-3 code expressed in the input file.
-
- The iec2iec compiler generates IEC61131-3 code which is equivalent to the IEC 61131-3 code expressed in the input file.
-This last compiler should generate and output file which should be almost identical to the input file (some formating 
-may change, as well as the case of letters, etc.). This 'compiler' is mostly used by the matiec project contributors
-to help debug the lexical and syntax portions of the compilers.
-
-
-
- To compile/build these compilers, just
+该项目的目标是开发一个开源编译器，用于 IEC 61131-3 标准中定义的编程语言。这些编程语言主要用于工业自动化领域，用于编程可编程逻辑控制器（PLC）。
+该标准定义了 5 种编程语言：
+IL：指令列表（Instruction List）
+一种类似汇编语言的文本编程语言。
+ST：结构化文本（Structured Text）
+一种类似 Pascal 的文本编程语言。
+FBD：功能块图（Function Block Diagram）
+一种基于小规模集成电路（如计数器、与/或/异或逻辑门、定时器等）的图形化编程语言，类似于电气电路图。
+LD：梯形图（Ladder Diagram）
+一种基于继电器的图形化编程语言，类似于电气电路图（用于基本的有线逻辑控制器）。
+SFC：顺序功能图（Sequential Function Chart）
+一种基于 Grafcet 的图形化编程语言，用于定义状态机（也可以用文本格式表示）。
+在上述 5 种语言中，标准定义了 IL、ST 和 SFC 的文本表示形式。我们主要针对这 3 种语言，并且目前支持它们的文本格式。
+目前，matiec 项目生成两个编译器（更准确地说是代码转换器，但我们喜欢称它们为编译器）：iec2c 和 iec2iec。
+这两个编译器接受相同的输入：包含 ST、IL 和/或 SFC 代码的文本文件。
+iec2c 编译器生成与输入文件中表达的 IEC 61131-3 代码等效的 ANSI C 代码。
+iec2iec 编译器生成与输入文件中表达的 IEC 61131-3 代码等效的 IEC 61131-3 代码。该编译器生成的输出文件应几乎与输入文件相同（可能会有一些格式变化，以及字母大小写等）。这个“编译器”主要用于 matiec 项目的贡献者，帮助调试编译器的词法和语法部分。
+要编译/构建这些编译器，只需运行以下命令：
 $./configure; make
-
-
-
-
-
-****************************************************************
-****************************************************************
-****************************************************************
-*********                                              *********
-*********                                              *********
 *********   O V E R A L L    A R C H I T E C T U R E   *********
-*********                                              *********
-*********                                              *********
-****************************************************************
-****************************************************************
-****************************************************************
-
- The compiler works in 4(+1) stages:
- ==================================
- Stage 1    - Lexical analyser       - implemented with flex (stage1_2/iec_flex.ll)
- Stage 2    - Syntax parser          - implemented with bison (stage1_2/iec_bison.yy)
- Stage pre3 - Populate symbol tables - Symbol tables that will ease searching for symbols in the abstract symbol tree.
- Stage 3    - Semantics analyser     - currently does type checking only
- Stage 4    - Code generator         - generates ANSI C code
-
- Stage 5    - Binary code generator - gcc, javac, etc... (Not integrated into matiec compiler. Must be called explicitly by the user.)
-
-
-
- Data structures passed between stages, in global variables:
- ==========================================================
-   1->2   : tokens (int), and token values (char *) (defined in stage1_2/stage1_2_priv.hh)
-   2->1   : symbol tables (implemented in util/symtable.[hh|cc], and defined in stage1_2/stage1_2_priv.hh)
-   2->3   : abstract syntax tree (tree of C++ objects, whose classes are defined in absyntax/absyntax.hh)
-pre3->3,4 : global symbol tables (defined in util/[d]symtable.[hh|cc] and declared in absyntax_utils/absyntax_utils.hh)
-   3->4   : abstract syntax tree (same as 2->3), but now annotated (i.e. some extra data inserted into the absyntax tree)
-
-   4->5   : file with program in c, java, etc...
-
-
-
-
- The compiler works in several passes:
- ====================================
-
-Stage 1 and Stage 2
--------------------
-  Executed in one single pass. This pass will:
-  - Do lexical analysis
-  - Do syntax analysis
-  - Execute the absyntax_utils/add_en_eno_param_decl_c visitor class
-    This class will add the EN and ENO parameter declarations to all
-    functions that do not have them already explicitly declared by the user.
-    This will let us handle these parameters in the remaining compiler just as if
-    they were standard input/output parameters.
-
-
-Stage Pre3
-----------
-  Executed in one single pass. This pass will populate the following symbol tables:
-   - function_symtable;            /* A symbol table with all globally declared functions POUs. */
-   - function_block_type_symtable; /* A symbol table with all globally declared functions block POUs. */
-   - program_type_symtable;        /* A symbol table with all globally declared program POUs. */
-   - type_symtable;                /* A symbol table with all user declared (non elementary) datat type definitions. */
-   - enumerated_value_symtable;    /* A symbol table with all identifiers (values) declared for enumerated types. */
-
-
-Stage 3
--------
-  Executes two algorithms (flow control analysis, and data type analysis) in several passes.
-
-  Flow control:
-     Pass 1: Does flow control analysis (for now only of IL code) 
-             Implemented in -> stage3/flow_control_analysis_c
-             This will anotate the abstract syntax tree 
-             (Every object of the class il_instruction_c that is in the abstract syntax tree will have the variable 'prev_il_instruction' correctly filled in.)
-
-  Data Type Analysis
-     Pass 1: Analyses the possible data types each expression/literal/IL instruction/etc. may take 
-             Implemented in -> stage3/fill_candidate_datatypes_c
-             This will anotate the abstract syntax tree 
-             (Every object of in the abstract syntax tree that may have a data type, will have the variable 'candidate_datatypes' correctly filled in.
-             Additionally, objects in the abstract syntax tree that represen function invocations will have the variable 
-              'candidate_functions' correctly filled in.)
-Pass 2: Narrows all the possible data types each expression/literal/IL instruction/etc. may take down to a single data type 
-             Implemented in -> stage3/narrow_candidate_datatypes_c
-             This will anotate the abstract syntax tree 
-             (Every object of in the abstract syntax tree that may have a data type, will have the variable 'datatype' correctly filled in.
-              Additionally, objects in the abstract syntax tree that represen function invocations will have the variables 
-              'called_function_declaration' and 'extensible_param_count' correctly filled in.
-              Additionally, objects in the abstract syntax tree that represen function block (FB) invocations will have the variable
-              'called_fb_declaration' correctly filled in.)
-     Pass 2: Prints error messages in the event of the IEC 61131-3 source code being analysed contains semantic data type incompatibility errors.
-             Implemented in -> stage3/print_datatype_errors_c
-
-  
-Stage 4
--------
-  Has 2 possible implementations.
-  
-  iec2c  :  Generates C source code in a single pass (stage4/generate_c).
-  iec2iec:  Generates IEC61131 source code in a single pass (stage4/generate_iec).
-
-
-
-
-
-
-****************************************************************
-****************************************************************
-****************************************************************
-*********                                              *********
-*********                                              *********
+编译器的工作分为 4(+1) 个阶段：
+阶段 1 - 词法分析器 - 使用 flex 实现（stage1_2/iec_flex.ll）
+阶段 2 - 语法分析器 - 使用 bison 实现（stage1_2/iec_bison.yy）
+阶段 pre3 - 填充符号表 - 用于在抽象语法树中方便查找符号的符号表。
+阶段 3 - 语义分析器 - 目前仅执行类型检查。
+阶段 4 - 代码生成器 - 生成 ANSI C 代码。
+阶段 5 - 二进制代码生成器 - gcc、javac 等（未集成到 matiec 编译器中，需用户显式调用）。
+阶段之间传递的数据结构（通过全局变量）：
+1->2：标记（int）和标记值（char *）（定义在 stage1_2/stage1_2_priv.hh 中）
+2->1：符号表（在 util/symtable.[hh|cc] 中实现，并在 stage1_2/stage1_2_priv.hh 中定义）
+2->3：抽象语法树（C++ 对象树，其类定义在 absyntax/absyntax.hh 中）
+pre3->3,4：全局符号表（定义在 util/[d]symtable.[hh|cc] 中，并在 absyntax_utils/absyntax_utils.hh 中声明）
+3->4：抽象语法树（与 2->3 相同），但已标注（即在抽象语法树中插入了一些额外数据）
+4->5：包含 C、Java 等程序的文件。
+编译器的工作分为多个遍历：
+阶段 1 和阶段 2
+在单一遍历中执行。该遍历将：
+执行词法分析
+执行语法分析
+执行 absyntax_utils/add_en_eno_param_decl_c 访问者类
+该类将为所有尚未明确声明 EN 和 ENO 参数的函数添加这些参数声明。这将使我们在剩余的编译器中可以像处理标准输入/输出参数一样处理这些参数。
+阶段 pre3
+在单一遍历中执行。该遍历将填充以下符号表：
+function_symtable；/* 包含所有全局声明的函数 POU 的符号表 */
+function_block_type_symtable；/* 包含所有全局声明的功能块 POU 的符号表 */
+program_type_symtable；/* 包含所有全局声明的程序 POU 的符号表 */
+type_symtable；/* 包含所有用户声明的（非基本）数据类型定义的符号表 */
+enumerated_value_symtable；/* 包含所有枚举类型中声明的标识符（值）的符号表 */
+阶段 3
+执行两个算法（流程控制分析和数据类型分析），分为多个遍历。
+流程控制：
+遍历 1：执行流程控制分析（目前仅针对 IL 代码）
+实现于 -> stage3/flow_control_analysis_c
+这将标注抽象语法树（抽象语法树中每个 il_instruction_c 类的对象都将正确填充变量 prev_il_instruction）。
+数据类型分析：
+遍历 1：分析每个表达式/字面量/IL 指令等可能的数据类型
+实现于 -> stage3/fill_candidate_datatypes_c
+这将标注抽象语法树（抽象语法树中每个可能具有数据类型的对象都将正确填充变量 candidate_datatypes。此外，抽象语法树中表示函数调用的对象将正确填充变量 candidate_functions）。
+遍历 2：将每个表达式/字面量/IL 指令等可能的数据类型缩小到单一数据类型
+实现于 -> stage3/narrow_candidate_datatypes_c
+这将标注抽象语法树（抽象语法树中每个可能具有数据类型的对象都将正确填充变量 datatype。此外，抽象语法树中表示函数调用的对象将正确填充变量 called_function_declaration 和 extensible_param_count。此外，抽象语法树中表示功能块（FB）调用的对象将正确填充变量 called_fb_declaration）。
+遍历 2：如果被分析的 IEC 61131-3 源代码存在语义数据类型不兼容错误，则打印错误消息。
+实现于 -> stage3/print_datatype_errors_c
+阶段 4
+有两种可能的实现：
+iec2c：在单一遍历中生成 C 源代码（stage4/generate_c）。
+iec2iec：在单一遍历中生成 IEC 61131 源代码（stage4/generate_iec）。
 *********               N O T E S                      *********
-*********                                              *********
-*********                                              *********
-****************************************************************
-****************************************************************
-****************************************************************
-
-
-
-
-
-
- NOTE 1
- ======
- Note that stage 2 passes data back to stage 1. This is only
-possible because both stages are executed in the same pass.
-
-
-
- NOTE 2
- ======
- It would be nice to get this parser integrated into the gcc
-group of compilers. We would then be able to compile our st/il
-programs directly into executable binaries, for all the processor
-architectures gcc currently supports.
- The gcc compilers are divided into a frontend and backend. The
-data structure between these two stages is called the syntax
-tree. In essence, we would need to create a new frontend that
-would parse the st/il program and build the syntax tree.
-Unfortunately the gcc syntax tree is not very well documented,
-and doing semantic checking on this tree would probably be a
-nightmare.
- We therefore chose to follow the same route as the gnat (ada 95)
-and cobol compilers, i.e. generate our own abstract syntax tree,
-do semantic checking on our tree, do whatever optimisation
-we can at this level on our own tree, and only then build
-the gcc syntax tree from our abstract syntax tree.
- All this may still be integrated with the gcc backend to generate
-a new gnu compiler for the st and il programming languages.
-Since generating the gcc syntax tree will probably envolve some
-trial and error effort due to the sparseness of documentation,
-we chose to start off by coding a C++ code generator for
-our stage 4. We may later implement a gcc syntax tree generator
-as an alternative stage 4 process, and then integrate it with
-the gcc toplevel.c file (command line parsing, etc...).
-
-
-
-****************************************************************
-****************************************************************
-****************************************************************
-*********                                              *********
-*********                                              *********
+注意事项 1
+======
+注意阶段 2 将数据传递回阶段 1。这仅因为这两个阶段在同一遍历中执行。
+注意事项 2
+======
+如果能将该解析器集成到 gcc 编译器系列中，那将非常不错。我们就可以将 st/il 程序直接编译为可执行二进制文件，支持 gcc 当前支持的所有处理器架构。
+gcc 编译器分为前端和后端。这两个阶段之间的数据结构称为语法树。本质上，我们需要创建一个新的前端，用于解析 st/il 程序并构建语法树。
+不幸的是，gcc 的语法树文档并不完善，对该树进行语义检查可能会非常困难。
+因此，我们选择与 gnat（ada 95）和 cobol 编译器相同的路径，即生成我们自己的抽象语法树，在我们的树上进行语义检查，尽可能在我们的树上进行优化，然后才从我们的抽象语法树构建 gcc 语法树。
+所有这些最终可能与 gcc 后端集成，生成一个新的 GNU 编译器，用于 st 和 il 编程语言。由于生成 gcc 语法树可能会涉及一些试错工作（由于文档较少），我们选择先从为阶段 4 编写 C++ 代码生成器开始。我们可能会在稍后实现一个 gcc 语法树生成器，作为阶段 4 的替代过程，然后将其与 gcc toplevel.c 文件（命令行解析等）集成。
 *********               S T A G E      1               *********
-*********                                              *********
-*********                                              *********
-****************************************************************
-****************************************************************
-****************************************************************
-
-
-
-Issue 1
-=======
-
- The syntax defines the common_character_representation as:
-<any printable character except '$', '"' or "'"> | <escape sequences>
-
- Flex includes the function print_char() that defines
-all printable characters portably (i.e. whatever character
-encoding is currently being used , ASCII, EBCDIC, etc...)
-Unfortunately, we cannot generate the definition of
-common_character_representation portably, since flex
-does not allow definition of sets by subtracting
-elements in one set from another set (Note how
-common_character_representation could be defined by
-subtracting '$' '"' and "'" from print_char() ).
-This means we must build up the defintion of
-common_character_representation using only set addition,
-which leaves us with the only choice of defining the
-characters non-portably...
-
- In short, the definition we use for common_character_representation
-only works for ASCII character encoding!
-
-
-
-
-Issue 2
-=======
-
-We extend the IEC 61131-3 standard syntax to allow inclusion of 
-other files. The accepted syntax is:
-
-   {#include "<filename>" }
-
-We use a pragma directive for this (allowed by the standard itself),
- since it is an extension of the standard. In principle, this would 
-be ignored by other standard complient compilers!
-
-
-
-****************************************************************
-****************************************************************
-****************************************************************
-*********                                              *********
-*********                                              *********
+问题 1
+======
+语法定义了公共字符表示为：
+<任何可打印字符，除了 '$'、'"' 或 ''' > | <转义序列>
+Flex 包含一个函数 print_char()，用于便携地定义所有可打印字符（即无论当前使用的字符编码是什么，ASCII、EBCDIC 等）。不幸的是，我们无法便携地生成公共字符表示的定义，因为 flex 不允许通过从一个集合中减去另一个集合的元素来定义集合（注意公共字符表示可以通过从 print_char() 中减去 '$'、'"' 和 ''' 来定义）。这意味着我们必须仅使用集合加法来构建公共字符表示的定义，这使得我们只能非便携地定义字符。
+简而言之，我们使用的公共字符表示的定义仅适用于 ASCII 字符编码！
+问题 2
+======
+我们扩展了 IEC 61131-3 标准语法以允许包含其他文件。接受的语法为：
+{#include "<filename>" }
+我们使用一个编译指令（标准本身允许）来实现这一点，因为它是一个标准的扩展。原则上，这将被其他标准兼容的编译器忽略！
 *********               S T A G E      2               *********
-*********                                              *********
-*********                                              *********
-****************************************************************
-****************************************************************
-****************************************************************
-
- Overall Comments
- ================
-
- 
- Comment 1
- ---------
- We have augmented the syntax the specification defines to include
-restrictions defined in the semantics of the languages.
-
- This is required because the syntax cannot be parsed by a LALR(1)
-parser as it is presented in the specification. Many reduce/reduce
-and shift/reduce conflicts arise. This is mainly because the parser
-cannot discern how to reduce an identifier. Identifiers show up in
-many places in the syntax, and it is not entirely possible to
-figure out if the identifier is a variable_name, enumeration
-value, function block name, etc... only from the context in
-which it appears.
-
- A more detailed example of why we need symbol tables are
-the type definitions...  In definition of new types
-(section B 1.3.3) the parser needs to figure out the class of
-the new type being defined (enumerated, structure, array, etc...).
-This works well when the base classes are elementary types
-(or structures, enumeration, arrays, etc. thereof). It becomes
-confusing to the parser when the new_type is based on a previously
-user defined type.
-
+总体评论
+================
+评论 1
+我们扩展了规范中定义的语法，以包括语言语义中定义的限制。
+这是必要的，因为规范中呈现的语法无法被 LALR(1) 解析器解析。会出现许多归约/归约和移入/归约冲突。这主要是因为解析器无法确定如何归约一个标识符。标识符在语法中出现在许多地方，仅从其出现的上下文中无法完全确定该标识符是变量名、枚举值、功能块名等。
+一个更详细的例子是类型定义……在定义新类型（第 B 1.3.3 节）时，解析器需要确定正在定义的新类型的类别（枚举、结构、数组等）。当基础类是基本类型（或结构、枚举、数组等）时，这可以很好地工作。当新类型基于用户之前定义的类型时，就会让解析器感到困惑。
+复制
 TYPE
   new_type_1 : INT := 99;
   new_type_2 : new_type_1 := 100;
 END_TYPE
-
- When parsing new_type_1, the parser can figure out that the
-identifier new_type_1 is a simple_type_name, because it is
-based on a elementary type without structure, arrays, etc...
- While parsing new_type_2, it becomes confused how to reduce
-the new_type_2 identifier, as it is based on the identifier
-new_type_1, of which it does not know the class (remember, at this
-stage new_type_1 is a simple identifier!).
- We therefore need to keep track of the class of the user
-defined types as they are declared, so that the lexical analyser
-can tell the syntax parser what class the type belongs to. We
-cannot use the abstract syntax tree itself to search for the
-declaration of new_type_1 as we only get a handle to the root
-of the tree at the end of the parsing.
-
- We therefore maintain an independent and parallel table of symbols,
-that is filled as we come across the type delcarations in the code.
-Actually, we ended up also needing to store variable names in
-the symbol table. Since variable names come and go out of scope
-depending on what portion of code we are parsing, we sometimes
-need to remove the variable names from the symbol table.
-Since the ST and IL languages only have a single level of scope,
-I (Mario) found it easier to simply use a second symbol table for
-the variable names that is completely cleared when the parser
-reaches the end of a function (function block or program).
-
-What I mean when I say that these languages have a single level
-of scope is that all variables used in a function (function block
-or program) must be declared inside that function (function block
-or program). Even global variables must be re-declared as EXTERN
-before a function may access them! This means that it is easy
-to simply load up the variable name symbol table when we start
-parsing a function (function block or program), and to clear it
-when we reach the end. Checking whether variables declared
-as EXTERN really exist inside a RESOURCE or a CONFIGURATION
-is left to stage 3 (semantic checking) where we can use the
-abstract tree itself to search for the variables (NOTE: semantic
-cheching at stage 3 has not yet been implemented, so we may yet
-end up using a symbol table too at that stage!).
-
- Due to the use of the symbol tables, and special identifier
-tokens depending on the type of identifier it had previously
-been declared in the code being parsed, the syntax was slightly
-changed regarding the definition of variable names, derived
-function names, etc... FROM for e.g.:
+在解析 new_type_1 时，解析器可以确定标识符 new_type_1 是一个简单类型名称，因为它基于一个没有结构、数组等的简单类型。
+在解析 new_type_2 时，解析器会混淆如何归约 new_type_2 标识符，因为它基于标识符 new_type_1，而它不知道该类型的类别（记住，在这个阶段，new_type_1 只是一个简单的标识符！）。
+因此，我们需要跟踪用户定义类型在其声明时的类别，以便词法分析器可以告诉语法解析器该类型属于哪个类别。我们不能使用抽象语法树本身来查找 new_type_1 的声明，因为我们只有在解析结束时才能获得树的根节点。
+因此，我们维护一个独立且并行的符号表，随着我们在代码中遇到类型声明而填充。实际上，我们最终还需要在符号表中存储变量名。由于变量名会根据我们正在解析的代码部分进出作用域，我们有时需要从符号表中移除变量名。由于 ST 和 IL 语言只有一级作用域，我发现（Mario）使用第二个符号表来存储变量名会更简单，当解析器到达函数（功能块或程序）的结尾时，完全清除该符号表。
+当我说这些语言只有一级作用域时，我的意思是函数（功能块或程序）中使用的所有变量都必须在该函数（功能块或程序）内部声明。即使是全局变量，也必须在函数可以访问它们之前重新声明为 EXTERN！这意味着在开始解析函数（功能块或程序）时，可以简单地加载变量名符号表，并在到达结尾时清除它。检查是否声明为 EXTERN 的变量确实存在于 RESOURCE 或 CONFIGURATION 中的任务留给了阶段 3（语义检查），在那里我们可以使用抽象树本身来查找变量（注意：阶段 3 的语义检查尚未实现，因此我们可能最终也会在那个阶段使用符号表！）。
+由于使用了符号表以及根据标识符在被解析代码中之前声明的类型而返回特殊标识符标记，语法在定义变量名、派生函数名等方面略有更改。例如：
+从：
 variable_name: identifier;
-TO
+到：
 variable_name: variable_name_token;
-
- Flex first looks at the symbol tables when it finds an identifier,
-and returns the correct token corresponding to the identifier
-type in question. Only if the identifier is not currently stored
-in any symbol table, does flex return a simple identifier_token.
-
- This means that the declarations of variables, functions etc...
-were changed FROM:
+Flex 首先在找到标识符时查看符号表，并返回与该标识符类型对应的正确标记。只有当标识符当前未存储在任何符号表中时，Flex 才返回一个简单的 identifier_token。
+这意味着变量、函数等的声明从：
+从：
 function_declaration: FUNCTION derived_function_name ...
-TO
+到：
 function_declaration: FUNCTION identifier ...
-since the initial definition of derived_function_name had been
-changed FROM
+因为最初对 derived_function_name 的定义从：
+从：
 derived_function_name: identifier;
-TO
+到：
 derived_function_name: derived_function_name_token;
-
-
-
-
- Comment 2
- ---------
- Since the ST and IL languages share a lot of common syntax,
-I have decided to write a single parser to handle both languages
-simultaneously. This approach has the advantage that the user
-may mix the language used in the same file, as long as each function
-is written in a single lanuage.
-
- This approach also assumes that all the IL language operators are
-keywords, which means that it is not possible to define variables
-using names such as "LD", "ST", etc...
-Note that the spec does not consider these operators to be keywords,
-so it means that they should be available for variable names! On the
-other hand, all implementations of the ST and IL languages seems to
-treat them as keywords, so there is not much harm in doing the same.
-
- If it ever becomes necessary to allow variables with names of IL 
-operators, either the syntax will have to be augmented, or we can 
-brake up the parser in two: one for ST and another for IL.
-
-
-
-/********************************/
-/* B 1.3.3 - Derived data types */
-/********************************/
-
-Issue 1
-=======
-
-According to the spec, the valid construct
+评论 2
+由于 ST 和 IL 语言共享许多共同的语法，我决定编写一个单一的解析器来同时处理这两种语言。这种方法的优点是用户可以在同一个文件中混合使用语言，只要每个函数用单一语言编写即可。
+这种方法还假设 IL 语言的所有操作符都是关键字，这意味着不能使用像“LD”、“ST”等名称定义变量。注意，规范并不将这些操作符视为关键字，因此它们应该可以用作变量名！另一方面，ST 和 IL 语言的所有实现似乎都将它们视为关键字，因此这样做也没有什么坏处。
+如果将来需要允许使用 IL 操作符名称的变量，那么要么需要扩展语法，要么我们可以将解析器拆分为两个：一个用于 ST，另一个用于 IL。
+//
+/* B 1.3.3 - 派生数据类型 */
+//
+问题 1
+======
+根据规范，有效的构造
 TYPE new_str_type : STRING := "hello!"; END_TYPE
-has two possible routes to type_declaration...
-
-Route 1:
+有两种可能的类型声明路径……
+路径 1：
+复制
 type_declaration: single_element_type_declaration
 single_element_type_declaration: simple_type_declaration
 simple_type_declaration: identifier ':' simple_spec_init
@@ -436,9 +151,8 @@ elementary_type_name: STRING
 (shift: constant <- "hello!")
 (reduce: simple_spec_init: simple_specification ASSIGN constant)
 (reduce: ...)
-
-
-Route 2:
+路径 2：
+复制
 type_declaration: string_type_declaration
 string_type_declaration: identifier ':' elementary_string_type_name string_type_declaration_size string_type_declaration_init
 (shift:  identifier <- 'new_str_type')
@@ -450,84 +164,23 @@ string_type_declaration_init: ASSIGN character_string
 (reduce: string_type_declaration_init <- ASSIGN character_string)
 (reduce: string_type_declaration <- identifier ':' elementary_string_type_name string_type_declaration_size string_type_declaration_init )
 (reduce: type_declaration <- string_type_declaration)
-
-
- At first glance it seems that removing route 1 would make
-the most sense. Unfortunately the construct 'simple_spec_init'
-shows up multiple times in other rules, so changing this construct
-would mean changing all the rules in which it appears.
-I (Mario) therefore chose to remove route 2 instead. This means
-that the above declaration gets stored in a
-simple_type_declaration_c, and not in a string_type_declaration_c
-as would be expected!
-
-
+乍一看，移除路径 1 似乎是最合理的。不幸的是，“simple_spec_init” 构造在其他规则中多次出现，因此更改此构造将意味着更改所有出现该构造的规则。因此，我（Mario）选择移除路径 2。这意味着上述声明将存储在 simple_type_declaration_c 中，而不是如预期的 string_type_declaration_c 中！
 /***********************/
-/* B 1.5.1 - Functions */
-/***********************/
-
-
-Issue 1
-=======
-
- Due to reduce/reduce conflicts between identifiers
-being reduced to either a variable or an enumerator value,
-we were forced to keep a symbol table of the names
-of all declared variables. Variables are no longer
-created from simple identifier_token, but from
-variable_name_token.
-
- BUT, in functions the function name may be used as
-a variable! In order to be able to parse this correctly,
-the token parser (flex) must return a variable_name_token
-when it comes across the function name, while parsing
-the function itself.
-We do this by inserting the function name into the variable
-symbol table, and having flex return a variable_name_token
-whenever it comes across it.
-When we finish parsing the function the variable name
-symbol table is cleared of all entries, and the function
-name is inserted into the library element symbol table. This
-means that from then onwards flex will return a
-derived_function_name_token whenever it comes across the
-function name.
-
-In order to insert the function name into the variable_name
-symbol table BEFORE the function body gets parsed, we
-need the parser to reduce a construct that contains the
-the function name. That is why we created the extra
-construct 'function_name_declaration', i.e. to force
-the parser to reduce it, before parsing the function body,
-and therefore get an oportunity to insert the function name
-into the variable name symbol table!
-
-
-/********************************/
-/* B 3.2.4 Iteration Statements */
-/********************************/
-
-Issue 1
-=======
-
-For the 'FOR' iteration loop
-
-  FOR control_variable ASSIGN expression TO expression BY expression DO statement_list END_FOR
-
-The spec declares the control variable in the syntax as
-
-  control_variable: identifier;
-
-but then defines the semantics of control_variable (Section 3.3.2.4)
-as being of an integer type (e.g., SINT, INT, or DINT).
-Obviously this presuposes that the control_variable must have been
-declared in some 'VAR .. VAR_END' construct, so I (Mario) changed
-the syntax to read
-
-  control_variable: variable_name;
-
-
-
-
-**************************************************************************
-
-  Copyright (C) 2003-2012  Mario de Sousa (msousa@fe.up.pt)
+/* B 1.5.1 - 函数 */
+问题 1
+======
+由于标识符在归约时可能会被解析为变量或枚举值，导致了归约/归约冲突，我们不得不维护一个所有已声明变量名称的符号表。变量不再是从简单的 identifier_token 创建的，而是从 variable_name_token 创建的。
+然而，在函数中，函数名称可能会被用作变量！为了能够正确解析这一点，标记解析器（flex）在解析函数本身时，遇到函数名称时必须返回一个 variable_name_token。我们通过将函数名称插入变量符号表中，并让 flex 在遇到它时返回一个 variable_name_token 来实现这一点。在我们完成函数的解析后，会清除变量名称符号表中的所有条目，并将函数名称插入到库元素符号表中。这意味着从那时起，flex 在遇到函数名称时将返回一个 derived_function_name_token。
+为了在解析函数体之前将函数名称插入变量名称符号表，我们需要解析器归约一个包含函数名称的构造。这就是为什么我们创建了额外的构造 function_name_declaration，即为了强制解析器在解析函数体之前归约它，从而获得将函数名称插入变量名称符号表的机会！
+//
+/* B 3.2.4 迭代语句 */
+//
+问题 1
+======
+对于 'FOR' 迭代循环：
+FOR control_variable ASSIGN expression TO expression BY expression DO statement_list END_FOR
+规范在语法中将控制变量声明为：
+control_variable: identifier;
+但随后在语义定义中（第 3.3.2.4 节），控制变量被定义为整数类型（例如，SINT、INT 或 DINT）。显然，这意味着控制变量必须已经在某个 'VAR .. VAR_END' 构造中声明过，因此我（Mario）将语法改为：
+control_variable: variable_name;
+版权所有 ©2003-2012 Mario de Sousa (msousa@fe.up.pt)
